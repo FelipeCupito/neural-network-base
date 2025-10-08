@@ -104,9 +104,9 @@ if __name__ == "__main__":
     l1_linear, trained_mdl = train_perceptron(df, l_mdl, learning_rate=lr, max_epochs=max_epochs, seed=42)
     print(f'Final L1 loss (LINEAR): {l1_linear[-1]:.3f}')
     # Entrenar y evaluar funcionamiento con perceptron no-lineal
-    non_l_mdl = Perceptron(num_inputs=3, activation_type="RELU")
+    non_l_mdl = Perceptron(num_inputs=3, activation_type="SIGMOID")
     l1_nonlinear, trained_mdl = train_perceptron(df, non_l_mdl, learning_rate=lr, max_epochs=max_epochs, seed=42)
-    print(f'Final L1 loss (RELU): {l1_nonlinear[-1]:.3f}')
+    print(f'Final L1 loss (SIGMOID): {l1_nonlinear[-1]:.3f}')
     #Mean L1 error comparison
     plt.figure(figsize=(10,8))
     plt.rcParams['axes.labelsize'] = 16    # x and y labels
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     plt.rcParams['axes.titlesize'] = 20    # title
     plt.title("MAE vs epochs")
     plt.plot(range(1, max_epochs+1),l1_linear, label='Linear activation', lw=4)
-    plt.plot(range(1, max_epochs+1),l1_nonlinear, label='Relu activation', lw=4)
+    plt.plot(range(1, max_epochs+1),l1_nonlinear, label='Sigmoid activation', lw=4)
     plt.ylabel('Mean(|y-ŷ|)')
     plt.xlabel('Epoch')
     plt.grid(True)
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     y = df['y'].values
     X = df.drop(columns=['y']).values
     topology = [3,1]
-    mdl = NeuralNetwork(topology, activation_type='RELU', )
+    mdl = NeuralNetwork(topology, activation_type='LINEAR', )
     b_size = 1
     opt_cfg = OptimizerConfig(type = 'SGD')
     loss = mae
@@ -190,8 +190,8 @@ if __name__ == "__main__":
     # ax.set_title('3D Scatter Plot')
     # plt.show()
 
-    # # #Plot fold 4
-    # fold4_details = fold_details[3]
+    #Plot fold 5
+    # fold4_details = fold_details[4]
     # train_indices = fold4_details['train_indices']
     # test_indices = fold4_details['test_indices']
     # fig = plt.figure(figsize=(10, 8))
