@@ -101,6 +101,42 @@ def add_noise_to_patterns(X, noise_level=0.1, seed=None):
     return X_noisy.astype(np.float32)
 
 
+def create_augmented_test_set(X, y, num_augmentations=10, noise_level=0.15, seed=None):
+    """
+    Create an augmented test set by generating multiple noisy versions of each digit.
+    This creates a more robust test set with multiple samples per class.
+
+    Args:
+        X: Original clean patterns (N, 35)
+        y: Original labels (N, 10) - one-hot encoded
+        num_augmentations: Number of noisy versions to create per digit
+        noise_level: Standard deviation of Gaussian noise
+        seed: Random seed for reproducibility
+
+    Returns:
+        X_test: Augmented test set (N * num_augmentations, 35)
+        y_test: Repeated labels (N * num_augmentations, 10)
+    """
+    if seed is not None:
+        np.random.seed(seed)
+
+    X_test_list = []
+    y_test_list = []
+
+    for i in range(len(X)):
+        for aug_idx in range(num_augmentations):
+            # Create a noisy version with a different seed for each augmentation
+            noise_seed = seed + i * num_augmentations + aug_idx if seed is not None else None
+            X_noisy = add_noise_to_patterns(X[i:i+1], noise_level=noise_level, seed=noise_seed)
+            X_test_list.append(X_noisy)
+            y_test_list.append(y[i:i+1])
+
+    X_test = np.vstack(X_test_list)
+    y_test = np.vstack(y_test_list)
+
+    return X_test, y_test
+
+
 def print_digit(pattern, digit_label, rows=7, cols=5):
     """Print a digit pattern in a readable format."""
     for i in range(rows):
@@ -552,7 +588,7 @@ def plot_training_history(loss_history, accuracy_history, output_dir, problem_na
     plt.close()
 
 
-def plot_confusion_matrix(network, X, y, digit_labels, output_dir, filename='confusion_matrix.png'):
+def plot_confusion_matrix(network, X, y, digit_labels, output_dir, filename='confusion_matrix.png', title_suffix=''):
     """Plot confusion matrix for digit classification."""
     os.makedirs(output_dir, exist_ok=True)
 
@@ -583,7 +619,8 @@ def plot_confusion_matrix(network, X, y, digit_labels, output_dir, filename='con
     # Add labels
     ax.set_xlabel('Predicted Digit', fontsize=12)
     ax.set_ylabel('True Digit', fontsize=12)
-    ax.set_title('Digit Classification - Confusion Matrix', fontsize=14, fontweight='bold')
+    title = f'Digit Classification - Confusion Matrix{title_suffix}'
+    ax.set_title(title, fontsize=14, fontweight='bold')
 
     # Add text annotations
     for i in range(num_classes):
@@ -637,12 +674,23 @@ def run_experiment_from_config(config_path: str):
         # Get noise level from config if available
         noise_level = getattr(config.problem, 'noise_level', 0.0)
         X_noisy = None
+        X_test_augmented = None
+        y_test_augmented = None
+
         if noise_level > 0:
+            # Create single noisy version for visual inspection
             X_noisy = add_noise_to_patterns(X, noise_level=noise_level, seed=config.seed)
+            # Create augmented test set with multiple noisy samples per digit
+            X_test_augmented, y_test_augmented = create_augmented_test_set(
+                X, y, num_augmentations=100, noise_level=noise_level, seed=config.seed
+            )
+            print(f"  Augmented test set size: {len(X_test_augmented)} samples ({len(X_test_augmented)//10} per digit)")
 
         extra_data = {
             'digit_labels': digit_labels,
             'X_noisy': X_noisy,
+            'X_test_augmented': X_test_augmented,
+            'y_test_augmented': y_test_augmented,
             'noise_level': noise_level
         }
         print(f"\nDataset loaded: {len(X)} digits (0-9)")
@@ -694,8 +742,18 @@ def run_experiment_from_config(config_path: str):
         # Confusion matrix for digit classification
         if problem_type == "digit_classification":
             safe_name = config.name.lower().replace(' ', '_')
+
+            # Generate confusion matrix for clean training data
             plot_confusion_matrix(network, X, y, extra_data['digit_labels'], str(plots_dir),
-                                filename=f'{safe_name}_confusion_matrix.png')
+                                filename=f'{safe_name}_confusion_matrix_clean.png',
+                                title_suffix=' (Clean Training Data - 10 samples)')
+
+            # Generate confusion matrix for augmented noisy test
+            if extra_data.get('X_test_augmented') is not None:
+                plot_confusion_matrix(network, extra_data['X_test_augmented'], extra_data['y_test_augmented'],
+                                    extra_data['digit_labels'], str(plots_dir),
+                                    filename=f'{safe_name}_confusion_matrix_test.png',
+                                    title_suffix=f' (Noisy Test Set - {len(extra_data["X_test_augmented"])} samples, {extra_data.get("noise_level", 0.0)*100:.0f}% noise)')
 
     # Save weights
     if config.training.save_weights:
