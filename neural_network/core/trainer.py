@@ -16,11 +16,17 @@ class Trainer:
             optimizer_config = OptimizerConfig()
         self.optimizer: OptimizerFunction = self._create_optimizer(optimizer_config)
 
-    def train(self, training_inputs: np.ndarray, training_labels: np.ndarray, batch_size: int = 32, verbose=False) -> None:
+    def train(self, training_inputs: np.ndarray, training_labels: np.ndarray, batch_size: int = 32, verbose=False,
+              x_val = None, y_val = None, patience = 10) -> None:
         if training_inputs.shape[0] != training_labels.shape[0]:
             raise ValueError("El número de muestras en 'training_inputs' y 'training_labels' debe ser el mismo.")
 
         num_samples = training_inputs.shape[0]
+        train_losses, val_losses = [], []
+        best_val_loss = np.inf
+        best_weights = None
+        patience_counter = 0
+
         for epoch in range(1, self.epochs + 1):
             total_loss = 0.0
             indices = np.arange(num_samples)
@@ -101,6 +107,37 @@ class Trainer:
                     
             if verbose and (epoch % 10 == 0 or epoch == 1):
                 print(f"Época {epoch}/{self.epochs} - Pérdida: {total_loss}")
+
+            avg_train_loss = total_loss/ (num_samples // batch_size)
+            train_losses.append(avg_train_loss)
+
+            #validation split
+            if x_val is not None:
+                y_pred = self.network.forward(x_val, training = False)
+                val_loss, _ = self.loss_f(y_pred, y_val)
+                val_losses.append(val_loss)
+
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    best_weights = [layer.weights.copy() for layer in self.network.layers]
+                    patience_counter = 0
+                else:
+                    patience_counter += 1
+
+                if verbose:
+                    print(f"Epoch {epoch}/{self.epochs} - Loss : {avg_train_loss:.4f} - Val: {val_loss:.4f}")
+
+                if patience_counter >= patience:
+                    print(f"Early stopping in epoch {epoch} (without patience {patience} imrpoving through epochs")
+                    if best_weights is not None:
+                        for layer, w in zip(self.network.layers, best_weights):
+                            layer.weights = w
+                    break
+            else:
+                if verbose:
+                    print(f"epoch {epoch}/{self.epochs} - Loss: {avg_train_loss:.4f}")
+
+        return train_losses, val_losses
 
     def _create_optimizer(self, optimizer_config: OptimizerConfig) -> OptimizerFunction:
         """Create optimizer instance 
