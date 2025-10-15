@@ -151,6 +151,8 @@ def train_and_evaluate(X, y, X_noisy, topology, learning_rate, optimizer_type,
             epochs_to_100 = epoch
             if verbose:
                 print(f"  Reached 100% at epoch {epoch}")
+            acc_arr[epoch-1:] = accuracy
+            loss_arr[epoch-1:] = batch_loss
             break
 
     if epochs_to_100 is None:
@@ -194,14 +196,14 @@ def run_optimizer_comparison(dataset_path, noise_level=0.15, seed=42):
 
     experiments = [
         # SGD (no momentum)
+        {'optimizer': 'sgd', 'lr': 0.001, 'momentum': 0.0},
+        {'optimizer': 'sgd', 'lr': 0.01, 'momentum': 0.0},
         {'optimizer': 'sgd', 'lr': 0.1, 'momentum': 0.0},
-        {'optimizer': 'sgd', 'lr': 0.3, 'momentum': 0.0},
-        {'optimizer': 'sgd', 'lr': 0.5, 'momentum': 0.0},
 
         # SGD with Momentum
+        {'optimizer': 'sgd_momentum', 'lr': 0.001, 'momentum': 0.9},
+        {'optimizer': 'sgd_momentum', 'lr': 0.01, 'momentum': 0.9},
         {'optimizer': 'sgd_momentum', 'lr': 0.1, 'momentum': 0.9},
-        {'optimizer': 'sgd_momentum', 'lr': 0.3, 'momentum': 0.9},
-        {'optimizer': 'sgd_momentum', 'lr': 0.5, 'momentum': 0.9},
 
         # Adam
         {'optimizer': 'adam', 'lr': 0.001, 'momentum': 0.9},
@@ -257,14 +259,19 @@ def plot_comparison_results(results, output_dir):
     os.makedirs(output_dir, exist_ok=True)
 
     # Change from 2x2 to 3x2 grid to accommodate new plots
-    plt.rcParams['figure.figsize'] = (16, 18)  # Increased height for additional plots
-    fig, axes = plt.subplots(3, 2, figsize=(16, 18))
+    plt.rcParams['figure.figsize'] = (20, 16)  # Increased height for additional plots
+    fig, axes = plt.subplots(2, 3, figsize=(20, 16))
 
     # Color palette for optimizers
     optimizer_colors = {
         'SGD': '#e74c3c',
         'SGD MOMENTUM': '#3498db',
         'ADAM': '#2ecc71'
+    }
+    linetypes = {
+        0.001: '-',
+        0.01: ':',
+        0.1: '-.'
     }
 
     labels = [f"{r['optimizer']}\nLR={r['lr']}" for r in results]
@@ -356,7 +363,7 @@ def plot_comparison_results(results, output_dir):
     ax4.set_ylim([0, 105])
 
     # 5: Loss vs Epochs for each optimizer
-    ax5 = axes[2, 0]
+    ax5 = axes[0, 2]
     
     for r in results:
         optimizer = r['optimizer']
@@ -367,19 +374,20 @@ def plot_comparison_results(results, output_dir):
         label = f"{optimizer} LR={lr}"
         ax5.plot(epochs_range, loss_arr, 
                 color=optimizer_colors[optimizer], 
-                alpha=0.7, 
-                linewidth=2,
+                alpha=0.5, 
+                linewidth=3,
+                linestyle=linetypes[lr],
                 label=label)
 
     ax5.set_xlabel('Epoch', fontsize=12, fontweight='bold')
     ax5.set_ylabel('Loss', fontsize=12, fontweight='bold')
     ax5.set_title('Training Loss vs Epochs', fontsize=14, fontweight='bold')
-    ax5.legend(fontsize=9, loc='best')
+    ax5.legend(fontsize=9, loc='best', handlelength=4)
     ax5.grid(True, alpha=0.3)
-    ax5.set_yscale('log')  # Often useful for loss plots
+    ax5.set_ylim(bottom=0)  # Often useful for loss plots
 
     # 6: Accuracy vs Epochs for each optimizer
-    ax6 = axes[2, 1]
+    ax6 = axes[1, 2]
     
     for r in results:
         optimizer = r['optimizer']
@@ -390,14 +398,15 @@ def plot_comparison_results(results, output_dir):
         label = f"{optimizer} LR={lr}"
         ax6.plot(epochs_range, acc_arr, 
                 color=optimizer_colors[optimizer], 
-                alpha=0.7, 
-                linewidth=2,
+                alpha=0.5, 
+                linewidth=3,
+                linestyle=linetypes[lr],
                 label=label)
 
     ax6.set_xlabel('Epoch', fontsize=12, fontweight='bold')
     ax6.set_ylabel('Accuracy (%)', fontsize=12, fontweight='bold')
     ax6.set_title('Training Accuracy vs Epochs', fontsize=14, fontweight='bold')
-    ax6.legend(fontsize=9, loc='best')
+    ax6.legend(fontsize=9, loc='best', handlelength=4)
     ax6.grid(True, alpha=0.3)
     ax6.set_ylim([0, 105])
 
