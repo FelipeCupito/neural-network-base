@@ -91,7 +91,10 @@ def train_and_evaluate(X, y, X_noisy, topology, learning_rate, optimizer_type,
     num_samples = X.shape[0]
     batch_size = num_samples  # Full batch
 
+    #Metrics
     epochs_to_100 = None
+    acc_arr = np.empty(max_epochs)
+    loss_arr = np.empty(max_epochs)
 
     for epoch in range(1, max_epochs + 1):
         indices = np.arange(num_samples)
@@ -107,6 +110,7 @@ def train_and_evaluate(X, y, X_noisy, topology, learning_rate, optimizer_type,
             break
 
         batch_loss, _ = mse_loss(predictions, shuffled_labels)
+        loss_arr[epoch-1] = batch_loss
 
         # Backward pass
         deltas = []
@@ -140,11 +144,15 @@ def train_and_evaluate(X, y, X_noisy, topology, learning_rate, optimizer_type,
         predicted_classes = np.argmax(predictions, axis=1)
         true_classes = np.argmax(y, axis=1)
         accuracy = np.mean(predicted_classes == true_classes) * 100
+        #Save metric
+        acc_arr[epoch-1] = accuracy
 
         if accuracy == 100.0 and epochs_to_100 is None:
             epochs_to_100 = epoch
             if verbose:
                 print(f"  Reached 100% at epoch {epoch}")
+            acc_arr[epoch-1:] = accuracy
+            loss_arr[epoch-1:] = batch_loss
             break
 
     if epochs_to_100 is None:
@@ -165,7 +173,9 @@ def train_and_evaluate(X, y, X_noisy, topology, learning_rate, optimizer_type,
     return {
         'epochs_to_100': epochs_to_100,
         'noisy_accuracy': noisy_accuracy,
-        'calibration_score': calibration_score
+        'calibration_score': calibration_score,
+        'loss_arr': loss_arr,
+        'acc_arr': acc_arr
     }
 
 
@@ -186,14 +196,14 @@ def run_optimizer_comparison(dataset_path, noise_level=0.15, seed=42):
 
     experiments = [
         # SGD (no momentum)
+        {'optimizer': 'sgd', 'lr': 0.001, 'momentum': 0.0},
+        {'optimizer': 'sgd', 'lr': 0.01, 'momentum': 0.0},
         {'optimizer': 'sgd', 'lr': 0.1, 'momentum': 0.0},
-        {'optimizer': 'sgd', 'lr': 0.3, 'momentum': 0.0},
-        {'optimizer': 'sgd', 'lr': 0.5, 'momentum': 0.0},
 
         # SGD with Momentum
+        {'optimizer': 'sgd_momentum', 'lr': 0.001, 'momentum': 0.9},
+        {'optimizer': 'sgd_momentum', 'lr': 0.01, 'momentum': 0.9},
         {'optimizer': 'sgd_momentum', 'lr': 0.1, 'momentum': 0.9},
-        {'optimizer': 'sgd_momentum', 'lr': 0.3, 'momentum': 0.9},
-        {'optimizer': 'sgd_momentum', 'lr': 0.5, 'momentum': 0.9},
 
         # Adam
         {'optimizer': 'adam', 'lr': 0.001, 'momentum': 0.9},
@@ -230,7 +240,10 @@ def run_optimizer_comparison(dataset_path, noise_level=0.15, seed=42):
             'lr': exp['lr'],
             'epochs_to_100': metrics['epochs_to_100'],
             'noisy_accuracy': metrics['noisy_accuracy'],
-            'calibration': metrics['calibration_score']
+            'calibration': metrics['calibration_score'],
+            'loss_arr': metrics['loss_arr'],
+            'acc_arr': metrics['acc_arr']
+
         }
         results.append(result)
 
@@ -245,15 +258,20 @@ def plot_comparison_results(results, output_dir):
     """Create visualization plots for the comparison."""
     os.makedirs(output_dir, exist_ok=True)
 
-    plt.rcParams['figure.figsize'] = (16, 12)
-
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    # Change from 2x2 to 3x2 grid to accommodate new plots
+    plt.rcParams['figure.figsize'] = (20, 16)  # Increased height for additional plots
+    fig, axes = plt.subplots(2, 3, figsize=(20, 16))
 
     # Color palette for optimizers
     optimizer_colors = {
         'SGD': '#e74c3c',
         'SGD MOMENTUM': '#3498db',
         'ADAM': '#2ecc71'
+    }
+    linetypes = {
+        0.001: '-',
+        0.01: ':',
+        0.1: '-.'
     }
 
     labels = [f"{r['optimizer']}\nLR={r['lr']}" for r in results]
@@ -343,6 +361,54 @@ def plot_comparison_results(results, output_dir):
     ax4.legend(fontsize=10, loc='best')
     ax4.grid(True, alpha=0.3, which='both')
     ax4.set_ylim([0, 105])
+
+    # 5: Loss vs Epochs for each optimizer
+    ax5 = axes[0, 2]
+    
+    for r in results:
+        optimizer = r['optimizer']
+        lr = r['lr']
+        loss_arr = r['loss_arr']
+        epochs_range = range(1, len(loss_arr) + 1)
+        
+        label = f"{optimizer} LR={lr}"
+        ax5.plot(epochs_range, loss_arr, 
+                color=optimizer_colors[optimizer], 
+                alpha=0.5, 
+                linewidth=3,
+                linestyle=linetypes[lr],
+                label=label)
+
+    ax5.set_xlabel('Epoch', fontsize=12, fontweight='bold')
+    ax5.set_ylabel('Loss', fontsize=12, fontweight='bold')
+    ax5.set_title('Training Loss vs Epochs', fontsize=14, fontweight='bold')
+    ax5.legend(fontsize=9, loc='best', handlelength=4)
+    ax5.grid(True, alpha=0.3)
+    ax5.set_ylim(bottom=0)  # Often useful for loss plots
+
+    # 6: Accuracy vs Epochs for each optimizer
+    ax6 = axes[1, 2]
+    
+    for r in results:
+        optimizer = r['optimizer']
+        lr = r['lr']
+        acc_arr = r['acc_arr']
+        epochs_range = range(1, len(acc_arr) + 1)
+        
+        label = f"{optimizer} LR={lr}"
+        ax6.plot(epochs_range, acc_arr, 
+                color=optimizer_colors[optimizer], 
+                alpha=0.5, 
+                linewidth=3,
+                linestyle=linetypes[lr],
+                label=label)
+
+    ax6.set_xlabel('Epoch', fontsize=12, fontweight='bold')
+    ax6.set_ylabel('Accuracy (%)', fontsize=12, fontweight='bold')
+    ax6.set_title('Training Accuracy vs Epochs', fontsize=14, fontweight='bold')
+    ax6.legend(fontsize=9, loc='best', handlelength=4)
+    ax6.grid(True, alpha=0.3)
+    ax6.set_ylim([0, 105])
 
     plt.tight_layout()
     plot_path = os.path.join(output_dir, 'optimizer_comparison.png')
