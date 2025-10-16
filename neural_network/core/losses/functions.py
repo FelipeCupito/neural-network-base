@@ -23,3 +23,7 @@ def cross_entropy_loss(predictions: np.ndarray, targets: np.ndarray) -> (float, 
 def mae(x1, x2) -> (float, np.ndarray):
     "Mean absolute err"
     return np.mean(np.abs(x1-x2)), np.sign(x1-x2)/x1.shape[0]
+
+def mse(pred, label) -> (float, np.ndarray):
+    "Mean absolute err"
+    return np.mean((pred-label)**2), pred-label

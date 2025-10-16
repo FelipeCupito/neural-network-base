@@ -70,6 +70,6 @@ class Perceptron:
         elif init_type == "ones":
             return np.ones(num_inputs, dtype=np.float32)
         elif init_type == "random":
-            return (np.random.randn(num_inputs) * 0.1).astype(np.float32)
+            return (np.random.randn(num_inputs) * 0.01).astype(np.float32)
         else:
             raise ValueError(f"Tipo de inicialización de pesos no soportado: {init_type}")

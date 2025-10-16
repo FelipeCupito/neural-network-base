@@ -49,7 +49,7 @@ class Trainer:
                 total_loss += batch_loss
 
                 # FIX 1: Ensure batch_loss has correct shape for backpropagation
-                delta_output = loss_grad
+                delta_output = loss_grad*self.network.layers[-1].get_activation_derivative()
                 
                 deltas = [delta_output]  # Start with output layer delta
 
@@ -165,7 +165,9 @@ def k_fold_cross_validate(
     shuffle: bool = True,
     random_state: int = None,
     return_models: bool = False,
-    stratified: bool = False
+    stratified: bool = False,
+    verbose: bool = False,
+    patience: int = 100
 ) -> Dict[str, Union[float, List]]:
     """
     Perform k-fold cross-validation on a given dataset.
@@ -230,7 +232,8 @@ def k_fold_cross_validate(
         y_train, y_test = y[train_idx], y[test_idx]
         
         # Train model
-        tr.train(X_train, y_train, batch_size)
+        tr.train(X_train, y_train, batch_size, verbose,
+                  X_test, y_test, patience)
         
         # Make predictions
         y_pred = fold_model.forward(X_test)
